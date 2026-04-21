@@ -2,7 +2,17 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import joblib
 import pandas as pd
+import os
+import gdown
 
+MODEL_PATH = "Models/voting_classifier.sav"
+
+# Download model if not exists
+if not os.path.exists(MODEL_PATH):
+    os.makedirs("Models", exist_ok=True)
+    url = "https://drive.google.com/uc?id=1S0SAu6Pj2nbb2euwUN5yuK1nlRihhsMW"
+    print("Downloading model...")
+    gdown.download(url, MODEL_PATH, quiet=False)
 app = FastAPI()
 
 # Load model
