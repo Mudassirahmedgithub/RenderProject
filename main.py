@@ -3,21 +3,23 @@ from pydantic import BaseModel
 import joblib
 import pandas as pd
 import os
-import gdown
 
-MODEL_PATH = "Models/voting_classifier.sav"
-
-# Download model if not exists
-if not os.path.exists(MODEL_PATH):
-    os.makedirs("Models", exist_ok=True)
-    url = "https://drive.google.com/uc?id=1S0SAu6Pj2nbb2euwUN5yuK1nlRihhsMW"
-    print("Downloading model...")
-    gdown.download(url, MODEL_PATH, quiet=False)
 app = FastAPI()
 
-# Load model
-voting_clf = joblib.load("Models/voting_classifier.sav")
-scaler = joblib.load("Models/scaler.sav")
+# Paths (files already inside Models folder)
+MODEL_PATH = "Models/voting_classifier.joblib"
+SCALER_PATH = "Models/scaler.joblib"
+
+# Check if files exist
+if not os.path.exists(MODEL_PATH):
+    raise FileNotFoundError(f"Model file not found: {MODEL_PATH}")
+
+if not os.path.exists(SCALER_PATH):
+    raise FileNotFoundError(f"Scaler file not found: {SCALER_PATH}")
+
+# Load model and scaler
+voting_clf = joblib.load(MODEL_PATH)
+scaler = joblib.load(SCALER_PATH)
 
 # Feature names (same order!)
 feature_names = [
@@ -34,11 +36,14 @@ class InputData(BaseModel):
 
 @app.get("/")
 def home():
-    return {"status": "API running"}
+    return {"status": "API running 🚀"}
 
 @app.post("/predict")
 def predict(data: InputData):
     try:
+        if len(data.features) != len(feature_names):
+            return {"error": f"Expected {len(feature_names)} features"}
+
         df = pd.DataFrame([data.features], columns=feature_names)
         scaled = scaler.transform(df)
 
