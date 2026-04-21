@@ -3,25 +3,27 @@ from pydantic import BaseModel
 import joblib
 import pandas as pd
 import os
+from threading import Lock
 
 app = FastAPI()
 
-# Paths (files already inside Models folder)
+# Paths
 MODEL_PATH = "Models/voting_classifier.joblib"
 SCALER_PATH = "Models/scaler.joblib"
 
-# Check if files exist
+# Check files exist
 if not os.path.exists(MODEL_PATH):
     raise FileNotFoundError(f"Model file not found: {MODEL_PATH}")
 
 if not os.path.exists(SCALER_PATH):
     raise FileNotFoundError(f"Scaler file not found: {SCALER_PATH}")
 
-# Load model and scaler
-voting_clf = joblib.load(MODEL_PATH)
-scaler = joblib.load(SCALER_PATH)
+# Lazy-loaded globals
+voting_clf = None
+scaler = None
+model_lock = Lock()
 
-# Feature names (same order!)
+# Feature names
 feature_names = [
     'Active Min', 'Fwd PSH Flags', 'SYN Flag Count', 'Flow Packets/s',
     'Fwd Packets/s', 'Active Mean', 'Active Std', 'Flow IAT Min',
@@ -34,6 +36,17 @@ feature_names = [
 class InputData(BaseModel):
     features: list[float]
 
+# Lazy loader
+def load_models():
+    global voting_clf, scaler
+
+    if voting_clf is None or scaler is None:
+        with model_lock:
+            if voting_clf is None:
+                voting_clf = joblib.load(MODEL_PATH)
+            if scaler is None:
+                scaler = joblib.load(SCALER_PATH)
+
 @app.get("/")
 def home():
     return {"status": "API running 🚀"}
@@ -41,10 +54,17 @@ def home():
 @app.post("/predict")
 def predict(data: InputData):
     try:
+        load_models()
+
         if len(data.features) != len(feature_names):
             return {"error": f"Expected {len(feature_names)} features"}
 
-        df = pd.DataFrame([data.features], columns=feature_names)
+        df = pd.DataFrame(
+            [data.features],
+            columns=feature_names,
+            dtype="float32"
+        )
+
         scaled = scaler.transform(df)
 
         pred = voting_clf.predict(scaled)[0]
@@ -58,8 +78,7 @@ def predict(data: InputData):
     except Exception as e:
         return {"error": str(e)}
 
-
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 10000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, workers=1)
