@@ -6,7 +6,19 @@ import os
 from threading import Lock
 
 app = FastAPI()
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000",
+    "https://cyber-sheid.vercel.app/"]   
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Paths
 MODEL_PATH = "Models/voting_classifier.joblib"
 SCALER_PATH = "Models/scaler.joblib"
